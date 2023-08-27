@@ -1,8 +1,4 @@
-package main
-
-func GetHtmlLogin() []byte {
-	return []byte(`
-	<!DOCTYPE html>
+<!DOCTYPE html>
 	<html lang="en">
 	<head>
 		<meta charset="UTF-8">
@@ -11,14 +7,14 @@ func GetHtmlLogin() []byte {
 	</head>
 	<body>
 		<div class="center">
-			<h1>Login</h1>
+			<h1>Register</h1>
 			<div>
-				<form id="login-form">
+				<form id="register-form">
 					<label for="username">Username</label>
 					<input type="text" id="username" name="username">
 					<label for="Password">Password</label>
 					<input type="password" id="password" name="password"><br><br>
-					<input type="submit" value="Login">
+					<input type="submit" value="Register">
 				</form>
 			</div>
 		</div>
@@ -45,21 +41,21 @@ func GetHtmlLogin() []byte {
 
 	<script>
 	window.onload = function(){
-        document.getElementById("login-form").onsubmit = login
+        document.getElementById("register-form").onsubmit = register
     }
-	function login(){
+	function register(){
         let formData = {
             "username" : document.getElementById("username").value,
             "password" : document.getElementById("password").value
         }
-        fetch("loginUser", {
+        fetch("registerUser", {
             method: 'post',
             body: JSON.stringify(formData),
             mode: 'cors'
         }).then((response) =>{
             if(response.ok){
-				alert('You have logged in successfuly')
-                window.location.href = "./"
+				alert('You have registered successfuly')
+                //window.location.href = "./login"
             }else{
                 throw 'unauthorised'
             }
@@ -68,8 +64,3 @@ func GetHtmlLogin() []byte {
         return false
     }
 	</script>
-
-
-
-	`)
-}

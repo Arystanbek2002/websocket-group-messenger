@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Messenger</title>
+	</head>
+	<body>
+		<div class="center">
+			<h1>Users</h1>
+			<div id="users" style ="padding: 50px">`
+
+	        </div>
+	    </div>
+    </body>
+
+<style type="text/css">
+    body {
+        overflow: hidden;
+        padding: 0;
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgb(225, 239, 207);
+    }
+
+    .center {
+        margin: auto;
+        margin-top: 20px;
+        width: 50%;
+        padding: 10px;
+        background-color: rgb(148, 226, 141);
+    }
+</style>
+
+<script>
+
+    function appendUser(id, username){
+        console.log(123)
+        const inner = 
+            `<h3>` + username + `</h3>
+            <button onclick="location.href='messenger.html?sel=` + id + `'" type="button"> To chat </button>
+            </div>`
+            var div = document.createElement('div')
+            div.id = id.toString()
+            div.style.display = "flex"
+            div.style.width = "100%"
+            div.style.justifyContent = "space-between"
+            div.innerHTML = inner
+            document.getElementById("users").appendChild(div)
+    }
+
+    window.onload = function(){
+        const data = fetch("getUsers", {
+            method: 'get',
+            mode: 'cors'
+        }).then((response) =>{
+            if(response.ok){
+                return response.json()
+            }else{
+                throw 'error'
+            }
+        })//TODO: catch throw
+        const printUsers = () => {
+            data.then((a) => {
+                for(let i = 0; i < a.users.length; i++){
+                    appendUser(a.users[i].id, a.users[i].username)          
+                }
+            })
+        }
+
+        printUsers()
+    }
+
+    
+</script>

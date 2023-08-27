@@ -1,32 +1,36 @@
-package main
+package storage
 
 import (
 	"database/sql"
 	"fmt"
 	"os"
 
+	status "github.com/arystanbek2002/websocket-group-messenger/error_status"
+	"github.com/arystanbek2002/websocket-group-messenger/models"
 	_ "github.com/lib/pq"
 )
 
+//go:generate mockgen -source=storage.go -destination=mocks/mock.go
+
 type Storage interface {
-	CreateUser(*User) error
-	GetUser(int) (*User, error)
-	GetUsers() ([]*User, error)
-	LoginUser(string, string) (*User, error)
-	CreateDirect(*Direct) error
-	GetDirectByUsers(int, int) (*Direct, error, bool)
-	GetDirectByID(int) (*Direct, error)
-	GetDirects() ([]*Direct, error)
-	CreateMessage(*Message) error
-	GetMessagesByDirect(int) ([]*Message, error)
-	GetMessages() ([]*Message, error)
+	CreateUser(*models.User) error
+	GetUser(int) (*models.User, error)
+	GetUsers() ([]*models.User, error)
+	LoginUser(string, string) (*models.User, error)
+	CreateDirect(*models.Direct) error
+	GetDirectByUsers(int, int) (*models.Direct, error)
+	GetDirectByID(int) (*models.Direct, error)
+	GetDirects() ([]*models.Direct, error)
+	CreateMessage(*models.Message) error
+	GetMessagesByDirect(int) ([]*models.Message, error)
+	GetMessages() ([]*models.Message, error)
 }
 
 type PostrgresStore struct {
 	db *sql.DB
 }
 
-func newPostgresStore() (*PostrgresStore, error) {
+func NewPostgresStore() (*PostrgresStore, error) {
 	connStr := fmt.Sprintf("postgres://%s:%s@my_postrgres:5432/%s?sslmode=disable", os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_NAME"))
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
@@ -75,8 +79,8 @@ func (p *PostrgresStore) CreateUserTable() error {
 	return err
 }
 
-func (p *PostrgresStore) CreateUser(user *User) error {
-	password, err := HashPassword(user.Password)
+func (p *PostrgresStore) CreateUser(user *models.User) error {
+	password, err := models.HashPassword(user.Password)
 	if err != nil {
 		return err
 	}
@@ -87,7 +91,12 @@ func (p *PostrgresStore) CreateUser(user *User) error {
 	return nil
 }
 
-func (p *PostrgresStore) CreateDirect(direct *Direct) error {
+func (p *PostrgresStore) CreateDirect(direct *models.Direct) error {
+	if direct.FirstUser > direct.SecondUser {
+		temp := direct.FirstUser
+		direct.SecondUser = direct.FirstUser
+		direct.FirstUser = temp
+	}
 	_, err := p.db.Query("insert into directs (first_user, second_user, created_at) values($1, $2, $3)", direct.FirstUser, direct.SecondUser, direct.CreatedAt)
 	if err != nil {
 		return err
@@ -95,7 +104,7 @@ func (p *PostrgresStore) CreateDirect(direct *Direct) error {
 	return nil
 }
 
-func (p *PostrgresStore) CreateMessage(message *Message) error {
+func (p *PostrgresStore) CreateMessage(message *models.Message) error {
 	_, err := p.db.Query("insert into messages (from_id, direct_id, value, created_at) values($1, $2, $3, $4)", message.From, message.DirectID, message.Value, message.CreatedAt)
 	if err != nil {
 		return err
@@ -103,22 +112,22 @@ func (p *PostrgresStore) CreateMessage(message *Message) error {
 	return nil
 }
 
-func (p *PostrgresStore) GetUser(id int) (*User, error) {
+func (p *PostrgresStore) GetUser(id int) (*models.User, error) {
 	rows, err := p.db.Query("select * from users where id = $1", id)
 	if err != nil {
 		return nil, err
 	}
-	user := new(User)
+	user := new(models.User)
 	if rows.Next() {
 		if err := rows.Scan(&user.ID, &user.UserName, &user.Password, &user.CreatedAt); err != nil {
 			return nil, err
 		}
 		return user, nil
 	}
-	return nil, fmt.Errorf("account not found")
+	return nil, fmt.Errorf(status.UserNotFound)
 }
 
-func (p *PostrgresStore) GetDirectByUsers(id1, id2 int) (*Direct, error, bool) {
+func (p *PostrgresStore) GetDirectByUsers(id1, id2 int) (*models.Direct, error) {
 	if id1 > id2 {
 		temp := id1
 		id1 = id2
@@ -126,57 +135,57 @@ func (p *PostrgresStore) GetDirectByUsers(id1, id2 int) (*Direct, error, bool) {
 	}
 	rows, err := p.db.Query("select * from directs where first_user = $1 and second_user = $2", id1, id2)
 	if err != nil {
-		return nil, err, false
+		return nil, err //fmt.Errorf(status.DBError)
 	}
-	direct := new(Direct)
+	direct := new(models.Direct)
 	if rows.Next() {
 		if err := rows.Scan(&direct.ID, &direct.FirstUser, &direct.SecondUser, &direct.CreatedAt); err != nil {
-			return nil, err, false
+			return nil, err
 		}
-		return direct, nil, false
+		return direct, err //fmt.Errorf(status.DBError)
 	}
-	return nil, fmt.Errorf("direct not found"), true
+	return nil, fmt.Errorf(status.DirectNotFound)
 }
 
-func (p *PostrgresStore) GetDirectByID(id int) (*Direct, error) {
+func (p *PostrgresStore) GetDirectByID(id int) (*models.Direct, error) {
 	rows, err := p.db.Query("select * from directs where id = $1", id)
 	if err != nil {
 		return nil, err
 	}
-	direct := new(Direct)
+	direct := new(models.Direct)
 	if rows.Next() {
 		if err := rows.Scan(&direct.ID, &direct.FirstUser, &direct.SecondUser, &direct.CreatedAt); err != nil {
 			return nil, err
 		}
 		return direct, nil
 	}
-	return nil, fmt.Errorf("direct not found")
+	return nil, fmt.Errorf(status.DirectNotFound)
 }
 
-func (p *PostrgresStore) GetMessagesByDirect(id int) ([]*Message, error) {
+func (p *PostrgresStore) GetMessagesByDirect(id int) ([]*models.Message, error) {
 	rows, err := p.db.Query("select * from messages where direct_id = $1", id)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf(status.DBError)
 	}
-	messages := []*Message{}
+	messages := []*models.Message{}
 	for rows.Next() {
-		message := new(Message)
+		message := new(models.Message)
 		if err := rows.Scan(&message.ID, &message.From, &message.DirectID, &message.Value, &message.CreatedAt); err != nil {
-			return nil, err
+			return nil, fmt.Errorf(status.DBError)
 		}
 		messages = append(messages, message)
 	}
 	return messages, nil
 }
 
-func (p *PostrgresStore) GetMessages() ([]*Message, error) {
+func (p *PostrgresStore) GetMessages() ([]*models.Message, error) {
 	rows, err := p.db.Query("select * from messages")
 	if err != nil {
 		return nil, err
 	}
-	messages := []*Message{}
+	messages := []*models.Message{}
 	for rows.Next() {
-		message := new(Message)
+		message := new(models.Message)
 		if err := rows.Scan(&message.ID, &message.From, &message.DirectID, &message.Value, &message.CreatedAt); err != nil {
 			return nil, err
 		}
@@ -185,14 +194,14 @@ func (p *PostrgresStore) GetMessages() ([]*Message, error) {
 	return messages, nil
 }
 
-func (p *PostrgresStore) GetUsers() ([]*User, error) {
+func (p *PostrgresStore) GetUsers() ([]*models.User, error) {
 	rows, err := p.db.Query("select * from users")
 	if err != nil {
 		return nil, err
 	}
-	users := []*User{}
+	users := []*models.User{}
 	for rows.Next() {
-		user := new(User)
+		user := new(models.User)
 		if err := rows.Scan(&user.ID, &user.UserName, &user.Password, &user.CreatedAt); err != nil {
 			return nil, err
 		}
@@ -201,14 +210,14 @@ func (p *PostrgresStore) GetUsers() ([]*User, error) {
 	return users, nil
 }
 
-func (p *PostrgresStore) GetDirects() ([]*Direct, error) {
+func (p *PostrgresStore) GetDirects() ([]*models.Direct, error) {
 	rows, err := p.db.Query("select * from directs")
 	if err != nil {
 		return nil, err
 	}
-	directs := []*Direct{}
+	directs := []*models.Direct{}
 	for rows.Next() {
-		direct := new(Direct)
+		direct := new(models.Direct)
 		if err := rows.Scan(&direct.ID, &direct.FirstUser, &direct.SecondUser, &direct.CreatedAt); err != nil {
 			return nil, err
 		}
@@ -217,21 +226,21 @@ func (p *PostrgresStore) GetDirects() ([]*Direct, error) {
 	return directs, nil
 }
 
-func (p *PostrgresStore) LoginUser(username, password string) (*User, error) {
+func (p *PostrgresStore) LoginUser(username, password string) (*models.User, error) {
 	rows, err := p.db.Query("select * from users where username = $1", username)
 	if err != nil {
 		return nil, err
 	}
-	user := new(User)
+	user := new(models.User)
 	if rows.Next() {
 		if err := rows.Scan(&user.ID, &user.UserName, &user.Password, &user.CreatedAt); err != nil {
 			return nil, err
 		}
-		err := CheckPasswordHash(password, user.Password)
+		err := models.CheckPasswordHash(password, user.Password)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf(status.WrongCredentials)
 		}
 		return user, nil
 	}
-	return nil, fmt.Errorf("credentials are wrong")
+	return nil, fmt.Errorf(status.WrongCredentials)
 }

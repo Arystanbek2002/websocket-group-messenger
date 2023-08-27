@@ -3,12 +3,14 @@ package main
 import (
 	"log"
 
+	"github.com/arystanbek2002/websocket-group-messenger/api"
+	"github.com/arystanbek2002/websocket-group-messenger/storage"
 	"github.com/joho/godotenv"
 )
 
 func main() {
 	godotenv.Load()
-	store, err := newPostgresStore()
+	store, err := storage.NewPostgresStore()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -17,6 +19,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	server := newAPIServer(":8080", store)
+	server := api.NewAPIServer(":8080", store)
 	server.Run()
 }

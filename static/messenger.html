@@ -1,11 +1,3 @@
-package main
-
-import (
-	"fmt"
-	"strconv"
-)
-
-var htmlString1 = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -26,9 +18,7 @@ var htmlString1 = `
     <br>
     <br>
 
-    <textarea name="messagearea" id="chatmessages" cols="50" rows="7" readonly placeholder="Welcome to chat">`
-
-var htmlString2 = `</textarea>
+    <textarea name="messagearea" id="chatmessages" cols="50" rows="7" readonly placeholder="Welcome to chat"></textarea>
 <br>
 <br>
 <form id="chatroom-message" onsubmit="sendMessage">
@@ -42,10 +32,12 @@ var htmlString2 = `</textarea>
 </body>
 
 <script>
-var selectedChat = "general"
-var direct = `
 
-var htmlString3 = `
+var selectedChat = "general"
+var direct = -1
+var thisUser = -1
+var secUser = -1
+
 class Event {
 constructor(type, payload){
     this.type = type;
@@ -93,40 +85,38 @@ switch(event.type){
 }
 
 function appendChatMessage(messageEvent){
-var date = new Date(messageEvent.sent)
-const formatedMsg = date.toLocaleString() + " " + messageEvent.from + ": " + messageEvent.message
-document.getElementById("chatmessages").innerHTML = document.getElementById("chatmessages").innerHTML + "\n" + formatedMsg
-document.getElementById("chatmessages").scrollTop = document.getElementById("chatmessages").scrollHeight
+    if(messageEvent.from == thisUser.username){
+        username = "You"
+    }else{
+        username = messageEvent.from
+    }
+    var date = new Date(messageEvent.sent)
+    const formatedMsg = date.toLocaleString() + " " + username + ": " + messageEvent.message
+    document.getElementById("chatmessages").innerHTML = document.getElementById("chatmessages").innerHTML + formatedMsg + "\n"
+    document.getElementById("chatmessages").scrollTop = document.getElementById("chatmessages").scrollHeight
+}
+
+function appendChatMessageOnLoad(user, sent, message){
+    let username
+    if(user == thisUser.id){
+        username = "You"
+    }else{
+        username = secUser.username
+    }
+    var date = new Date(sent)
+    const formatedMsg = date.toLocaleString() + " " + username + ": " + message
+    document.getElementById("chatmessages").innerHTML = document.getElementById("chatmessages").innerHTML + formatedMsg + "\n"
+    document.getElementById("chatmessages").scrollTop = document.getElementById("chatmessages").scrollHeight
 }
 
 function sendEvent(eventName, payload){
-const event = new Event(eventName, payload)
-conn.send(JSON.stringify(event))
+    const event = new Event(eventName, payload)
+    conn.send(JSON.stringify(event))
 }
 
-function changeChatRoom(){
-var newChat = document.getElementById("chatroom").value
-if(newChat != null && newChat != selectedChat){
-    console.log(newChat)
-    selectedChat = newChat
-}
-return false;
-}
 
 function sendMessage(){  
-    const sendmessagepost = new sendMessagePost(document.getElementById("message").value)
-    fetch("http://localhost:8080/sendmessage", {
-        method: 'post',
-        body: JSON.stringify(sendmessagepost),
-        mode: 'cors'
-    }).then((response) =>{
-        if(response.ok){
-            
-        }else{
-            alert('Error!!!')
-            return false
-        }
-    })//TODO: catch throw
+   
 var newMessage = document.getElementById("message")
 var outgoingEvent = new sendMessageEvent("username", newMessage.value)
 if(newMessage != null){
@@ -161,41 +151,71 @@ if(window["WebSocket"]){
 
 
 window.onload = function(){
-    document.getElementById("chatroom-selection").onsubmit = changeChatRoom
+    
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const selUser = parseInt(urlParams.get('sel'))
+    let formData = {
+        "sel" : selUser
+    }
+    const data = fetch("loadMessenger", {
+        method: 'post',
+        body: JSON.stringify(formData),
+        mode: 'cors'
+    }).then((response) => {
+        if(response.ok){
+			return response.json()
+        }else{
+            console.log("ahtung")
+        }
+    })
+
     document.getElementById("chatroom-message").onsubmit = sendMessage
 
+        
+    const printAddress = () => {
+        data.then((a) => {
+            direct = a.direct_id
+            thisUser = a.users[0] 
+            secUser = a.users[1]
+            for(let i = 0; i < a.messages.length; i++){
+                appendChatMessageOnLoad(a.messages[i].from, a.messages[i].created_at, a.messages[i].value)          
+            }
+        })
+    }
+    
+    printAddress();
+
     connectWebSocket()
+        
+        
+    
+    
+    
+    
+    
+    
 }
 </script>
 
 <style type="text/css">
 body {
-overflow: hidden;
-padding: 0;
-margin: 0;
-width: 100%;
-height: 100%;
-background-color: rgb(225, 239, 207);
+    overflow: hidden;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgb(225, 239, 207);
 }
 
 .center {
-margin: auto;
-margin-top: 20px;
-width: 50%;
-padding: 10px;
-background-color: rgb(148, 226, 141);
+    margin: auto;
+    margin-top: 20px;
+    width: 50%;
+    padding: 10px;
+    background-color: rgb(148, 226, 141);
 }
 </style>
 
 </html>
 `
-
-func GetHtmlMessenger(messages []*Message, users map[int]*User, directID int) []byte {
-	res := ""
-	res += htmlString1
-	for _, v := range messages {
-		res += fmt.Sprintf("%s %d-%d-%d %d:%d\n%s\n\n", users[v.From].UserName, v.CreatedAt.Day(), v.CreatedAt.Month(), v.CreatedAt.Year(), v.CreatedAt.Hour(), v.CreatedAt.Minute(), v.Value)
-	}
-	res += htmlString2 + strconv.Itoa(directID) + htmlString3
-	return []byte(res)
-}

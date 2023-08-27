@@ -1,4 +1,4 @@
-package main
+package message_entities
 
 import (
 	"context"
@@ -7,9 +7,13 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
+	"github.com/arystanbek2002/websocket-group-messenger/models"
+	"github.com/arystanbek2002/websocket-group-messenger/storage"
+	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/websocket"
 )
 
@@ -25,14 +29,14 @@ type Manager struct {
 	clients ClientList
 	sync.RWMutex
 	handlers map[string]EventHandler
-	server   *APIServer
+	storage  storage.Storage
 }
 
-func NewManager(ctx context.Context, server *APIServer) *Manager {
+func NewManager(ctx context.Context, storage storage.Storage) *Manager {
 	m := &Manager{
 		clients:  make(ClientList),
 		handlers: make(map[string]EventHandler),
-		server:   server,
+		storage:  storage,
 	}
 	m.setupEventHandlers()
 	return m
@@ -48,7 +52,7 @@ func (m *Manager) SendMessage(event Event, c *Client) error {
 		return fmt.Errorf("bad payload: %v", err)
 	}
 
-	direct, err := m.server.store.GetDirectByID(chatEvent.DirectID)
+	direct, err := m.storage.GetDirectByID(chatEvent.DirectID)
 	if err != nil {
 		return err
 	}
@@ -56,8 +60,8 @@ func (m *Manager) SendMessage(event Event, c *Client) error {
 		return fmt.Errorf("bad request")
 	}
 
-	message := NewMessage(c.id, direct.ID, chatEvent.Message)
-	if err := m.server.store.CreateMessage(message); err != nil {
+	message := models.NewMessage(c.id, direct.ID, chatEvent.Message)
+	if err := m.storage.CreateMessage(message); err != nil {
 		return err
 	}
 
@@ -95,7 +99,30 @@ func (m *Manager) routeEvent(event Event, c *Client) error {
 	}
 }
 
-func (m *Manager) serveWC(w http.ResponseWriter, r *http.Request) {
+type Claims struct {
+	ID       int    `json:"id"`
+	Username string `json:"username"`
+	jwt.RegisteredClaims
+}
+
+func verifyJWT(jwtString string) (int, *Claims, error) {
+	claims := &Claims{}
+	tkn, err := jwt.ParseWithClaims(jwtString, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("JWT_SECRET")), nil
+	})
+	if err != nil {
+		if err == jwt.ErrSignatureInvalid {
+			return http.StatusUnauthorized, nil, err
+		}
+		return http.StatusBadRequest, nil, err
+	}
+	if !tkn.Valid {
+		return http.StatusUnauthorized, nil, fmt.Errorf("not valid token")
+	}
+	return http.StatusOK, claims, nil
+}
+
+func (m *Manager) ServeWC(w http.ResponseWriter, r *http.Request) {
 	c, err := r.Cookie("x-jwt")
 	if err != nil {
 		if err == http.ErrNoCookie {

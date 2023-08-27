@@ -1,14 +1,14 @@
-package main
+package models
 
 import (
 	"time"
 )
 
 type Direct struct {
-	ID         int `json:"id"`
-	FirstUser  int `json:"first_user"`
-	SecondUser int `json:"second_user"`
-	CreatedAt  time.Time
+	ID         int       `json:"id"`
+	FirstUser  int       `json:"first_user"`
+	SecondUser int       `json:"second_user"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 func NewDirect(firstUser, secondUser int) *Direct {

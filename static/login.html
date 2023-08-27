@@ -1,7 +1,4 @@
-package main
-
-func GetHtmlRegister() []byte {
-	return []byte(`<!DOCTYPE html>
+<!DOCTYPE html>
 	<html lang="en">
 	<head>
 		<meta charset="UTF-8">
@@ -10,14 +7,14 @@ func GetHtmlRegister() []byte {
 	</head>
 	<body>
 		<div class="center">
-			<h1>Register</h1>
+			<h1>Login</h1>
 			<div>
-				<form id="register-form">
+				<form id="login-form">
 					<label for="username">Username</label>
 					<input type="text" id="username" name="username">
 					<label for="Password">Password</label>
 					<input type="password" id="password" name="password"><br><br>
-					<input type="submit" value="Register">
+					<input type="submit" value="Login">
 				</form>
 			</div>
 		</div>
@@ -44,21 +41,20 @@ func GetHtmlRegister() []byte {
 
 	<script>
 	window.onload = function(){
-        document.getElementById("register-form").onsubmit = register
+        document.getElementById("login-form").onsubmit = login
     }
-	function register(){
+	function login(){
         let formData = {
             "username" : document.getElementById("username").value,
             "password" : document.getElementById("password").value
         }
-        fetch("registerUser", {
+        fetch("loginUser", {
             method: 'post',
             body: JSON.stringify(formData),
             mode: 'cors'
         }).then((response) =>{
             if(response.ok){
-				alert('You have registered successfuly')
-                window.location.href = "./loginUser"
+				alert('You have logged in successfuly')
             }else{
                 throw 'unauthorised'
             }
@@ -67,8 +63,3 @@ func GetHtmlRegister() []byte {
         return false
     }
 	</script>
-
-
-
-	`)
-}

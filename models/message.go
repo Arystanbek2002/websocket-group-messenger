@@ -1,15 +1,15 @@
-package main
+package models
 
 import (
 	"time"
 )
 
 type Message struct {
-	ID        int    `json:"id"`
-	From      int    `json:"from"`
-	DirectID  int    `json:"direct_id"`
-	Value     string `json:"value"`
-	CreatedAt time.Time
+	ID        int       `json:"id"`
+	From      int       `json:"from"`
+	DirectID  int       `json:"direct_id"`
+	Value     string    `json:"value"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 func NewMessage(from int, direct int, value string) *Message {

@@ -1,4 +1,4 @@
-package main
+package message_entities
 
 import (
 	"encoding/json"
